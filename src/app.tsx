@@ -19,10 +19,16 @@ const TICK_MS = 1_000;
 const FIVE_HOUR_MS = 5 * 60 * 60 * 1000;
 const SEVEN_DAY_MS = 7 * 24 * 60 * 60 * 1000;
 
-// No upper cap: the box tracks the terminal's actual width. The -1 avoids
-// writing into the very last column, which some terminals treat as a wrap
-// trigger (an extra blank line appears after every redraw otherwise).
+// No upper cap: the box tracks the terminal's actual width. RIGHT_MARGIN
+// keeps every row strictly short of the terminal's last column — landing
+// exactly on it triggers the terminal's own auto-wrap, which Ink's cursor
+// math doesn't expect. That desync leaves one stale line behind on every
+// redraw after that, which compounds into a growing staircase of leftover
+// border fragments the longer the app runs. 1 column of margin isn't
+// enough insurance against a still-mismeasured glyph tipping a row over
+// by one column, hence 2.
 const MIN_WIDTH = 50;
+const RIGHT_MARGIN = 2;
 // Meter/sparkline size at the box width we designed the layout at (66 cols,
 // i.e. 62 of content) — extra terminal width beyond that grows them instead
 // of just leaving dead space on the right.
@@ -50,7 +56,7 @@ export function App() {
   const { exit } = useApp();
   const { isRawModeSupported } = useStdin();
   const columns = useTerminalColumns();
-  const width = Math.max(MIN_WIDTH, columns - 1);
+  const width = Math.max(MIN_WIDTH, columns - RIGHT_MARGIN);
   const compact = width < 60;
   const contentWidth = width - 4;
   const extra = Math.max(0, contentWidth - BASELINE_CONTENT_WIDTH);
