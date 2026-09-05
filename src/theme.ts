@@ -19,7 +19,10 @@ export const ICON = {
   burnRate: '🔥',
   sparkline: '📊',
   sessions: '🖥️',
-  resetClock: '🕕',
+  // ⏰ rather than a specific clock-face-at-N-o'clock glyph (🕕 etc.) —
+  // those are uncommon enough that several terminal emoji fonts (Windows
+  // Terminal included) fall back to a generic placeholder glyph for them.
+  resetClock: '⏰',
 } as const;
 
 /** Freshness / connection state shown as the header dot. */

@@ -19,14 +19,18 @@ const TICK_MS = 1_000;
 const FIVE_HOUR_MS = 5 * 60 * 60 * 1000;
 const SEVEN_DAY_MS = 7 * 24 * 60 * 60 * 1000;
 
+// No upper cap: the box tracks the terminal's actual width. The -1 avoids
+// writing into the very last column, which some terminals treat as a wrap
+// trigger (an extra blank line appears after every redraw otherwise).
 const MIN_WIDTH = 50;
-const MAX_WIDTH = 100;
 // Meter/sparkline size at the box width we designed the layout at (66 cols,
 // i.e. 62 of content) — extra terminal width beyond that grows them instead
 // of just leaving dead space on the right.
 const BASELINE_CONTENT_WIDTH = 62;
 const BASELINE_METER_WIDTH = 20;
 const BASELINE_SPARK_WIDTH = 10;
+const MAX_METER_WIDTH = 80;
+const MAX_SPARK_WIDTH = 40;
 
 type Freshness = 'live' | 'stale' | 'offline';
 
@@ -46,12 +50,12 @@ export function App() {
   const { exit } = useApp();
   const { isRawModeSupported } = useStdin();
   const columns = useTerminalColumns();
-  const width = Math.min(MAX_WIDTH, Math.max(MIN_WIDTH, columns));
+  const width = Math.max(MIN_WIDTH, columns - 1);
   const compact = width < 60;
   const contentWidth = width - 4;
   const extra = Math.max(0, contentWidth - BASELINE_CONTENT_WIDTH);
-  const meterWidth = Math.min(50, BASELINE_METER_WIDTH + Math.floor(extra * 0.7));
-  const sparkWidth = Math.min(24, BASELINE_SPARK_WIDTH + Math.floor(extra * 0.3));
+  const meterWidth = Math.min(MAX_METER_WIDTH, BASELINE_METER_WIDTH + Math.floor(extra * 0.7));
+  const sparkWidth = Math.min(MAX_SPARK_WIDTH, BASELINE_SPARK_WIDTH + Math.floor(extra * 0.3));
 
   const [usage, setUsage] = useState<UsageSnapshot | null>(null);
   const [usageFetchedAt, setUsageFetchedAt] = useState<Date | null>(null);
