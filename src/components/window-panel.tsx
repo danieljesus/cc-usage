@@ -14,6 +14,7 @@ interface WindowPanelProps {
   sparklineValues?: number[];
   projection?: Projection | null;
   meterWidth?: number;
+  sparkWidth?: number;
   compact?: boolean;
 }
 
@@ -42,6 +43,7 @@ export function WindowPanel({
   sparklineValues,
   projection,
   meterWidth = 20,
+  sparkWidth = 10,
   compact = false,
 }: WindowPanelProps) {
   if (!window) {
@@ -86,7 +88,7 @@ export function WindowPanel({
             {'  '}
             {ICON.sparkline}{' '}
           </Text>
-          <Sparkline values={sparklineValues} />
+          <Sparkline values={sparklineValues} width={sparkWidth} />
           {projection && (
             <Text color={MUTED}>
               {'   '}

@@ -37,6 +37,10 @@ export const VERDICT_ICON = {
 } as const;
 
 export const SESSION_ICON = {
-  working: '⚡',
+  // U+FE0F forces emoji (2-column) presentation — ⚡ alone defaults to text
+  // presentation in Unicode, and several terminals (Windows Terminal
+  // included) then render it 1-column-wide, which throws off column
+  // alignment against every other 2-column icon in this table.
+  working: '⚡️',
   idle: '💤',
 } as const;

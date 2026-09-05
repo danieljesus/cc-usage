@@ -1,4 +1,4 @@
-import { Box, Text, useApp, useInput, useStdin, useStdout } from 'ink';
+import { Box, Text, useApp, useInput, useStdin } from 'ink';
 import { useEffect, useState } from 'react';
 import { GradientBox } from './components/gradient-box.js';
 import { GradientText } from './components/gradient-text.js';
@@ -10,6 +10,7 @@ import { type SessionInfo, readSessions } from './data/sessions.js';
 import { readSnapshot } from './data/snapshot.js';
 import { type UsageSnapshot, fetchUsage } from './data/usage-api.js';
 import { age } from './format.js';
+import { useTerminalColumns } from './hooks/use-terminal-columns.js';
 import { project } from './projection.js';
 import { ICON, MUTED, STATUS_ICON } from './theme.js';
 
@@ -17,6 +18,15 @@ const POLL_MS = 30_000;
 const TICK_MS = 1_000;
 const FIVE_HOUR_MS = 5 * 60 * 60 * 1000;
 const SEVEN_DAY_MS = 7 * 24 * 60 * 60 * 1000;
+
+const MIN_WIDTH = 50;
+const MAX_WIDTH = 100;
+// Meter/sparkline size at the box width we designed the layout at (66 cols,
+// i.e. 62 of content) — extra terminal width beyond that grows them instead
+// of just leaving dead space on the right.
+const BASELINE_CONTENT_WIDTH = 62;
+const BASELINE_METER_WIDTH = 20;
+const BASELINE_SPARK_WIDTH = 10;
 
 type Freshness = 'live' | 'stale' | 'offline';
 
@@ -34,10 +44,14 @@ function seriesFor(points: HistoryPoint[], pick: (p: HistoryPoint) => number | n
 
 export function App() {
   const { exit } = useApp();
-  const { stdout } = useStdout();
   const { isRawModeSupported } = useStdin();
-  const width = Math.min(66, Math.max(50, stdout?.columns ?? 66));
+  const columns = useTerminalColumns();
+  const width = Math.min(MAX_WIDTH, Math.max(MIN_WIDTH, columns));
   const compact = width < 60;
+  const contentWidth = width - 4;
+  const extra = Math.max(0, contentWidth - BASELINE_CONTENT_WIDTH);
+  const meterWidth = Math.min(50, BASELINE_METER_WIDTH + Math.floor(extra * 0.7));
+  const sparkWidth = Math.min(24, BASELINE_SPARK_WIDTH + Math.floor(extra * 0.3));
 
   const [usage, setUsage] = useState<UsageSnapshot | null>(null);
   const [usageFetchedAt, setUsageFetchedAt] = useState<Date | null>(null);
@@ -157,6 +171,8 @@ export function App() {
         window={fiveHour}
         sparklineValues={fiveHourSpark}
         projection={fiveHourProjection}
+        meterWidth={meterWidth}
+        sparkWidth={sparkWidth}
         compact={compact}
       />
       <Box height={1} />
@@ -167,21 +183,41 @@ export function App() {
         window={sevenDay}
         sparklineValues={sevenDaySpark}
         projection={sevenDayProjection}
+        meterWidth={meterWidth}
+        sparkWidth={sparkWidth}
         compact={compact}
       />
 
       {usage?.sevenDayOpus && (
-        <WindowPanel icon={ICON.opus} label="OPUS 7d" window={usage.sevenDayOpus} compact />
+        <WindowPanel
+          icon={ICON.opus}
+          label="OPUS 7d"
+          window={usage.sevenDayOpus}
+          meterWidth={meterWidth}
+          compact
+        />
       )}
       {usage?.sevenDaySonnet && (
-        <WindowPanel icon={ICON.sonnet} label="SONNET 7d" window={usage.sevenDaySonnet} compact />
+        <WindowPanel
+          icon={ICON.sonnet}
+          label="SONNET 7d"
+          window={usage.sevenDaySonnet}
+          meterWidth={meterWidth}
+          compact
+        />
       )}
       {usage?.credits && (
-        <WindowPanel icon={ICON.credits} label="CRÉDITOS" window={usage.credits} compact />
+        <WindowPanel
+          icon={ICON.credits}
+          label="CRÉDITOS"
+          window={usage.credits}
+          meterWidth={meterWidth}
+          compact
+        />
       )}
 
       <Box height={1} />
-      <SessionsPanel sessions={sessions} width={width - 4} />
+      <SessionsPanel sessions={sessions} width={contentWidth} />
 
       <Box height={1} />
       <Text color={MUTED}>

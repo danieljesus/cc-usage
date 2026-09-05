@@ -1,6 +1,21 @@
 import type { HistoryPoint } from './data/history.js';
 
 const MIN_POINTS = 3;
+/**
+ * A regression over points that span only a few minutes is dominated by
+ * poll-to-poll noise — the denominator in the slope's variance term is tiny,
+ * so a couple of %-points of jitter turns into a wildly overstated %/hour
+ * rate. Require real elapsed time before trusting the trend at all.
+ *
+ * A flat floor isn't enough on its own, though: 15 minutes is a meaningful
+ * slice of a 5-hour window but nothing against a 7-day one — extrapolating
+ * a week from half an hour of data is how a single +1 percentage-point tick
+ * turned into "exhausts before reset" on a window sitting at 3% (seen in
+ * practice). So the real floor is a fraction of the window's own length,
+ * with MIN_SPAN_MS as the absolute lower bound for short windows.
+ */
+const MIN_SPAN_MS = 15 * 60 * 1000;
+const MIN_SPAN_FRACTION_OF_WINDOW = 0.03;
 /** Below this slope (%/hour) the trend is noise, not a real burn rate. */
 const FLAT_SLOPE_THRESHOLD = 0.05;
 
@@ -17,8 +32,9 @@ export interface Projection {
 /**
  * Linear regression of usage % over time, restricted to points from the
  * current window (i.e. since the last reset). Returns null when there isn't
- * enough signal yet — never invents a trend from fewer than 3 points or a
- * flat line.
+ * enough signal yet — never invents a trend from fewer than 3 points, too
+ * short an observed span relative to the window's own length, or a flat
+ * line.
  */
 export function project(
   points: HistoryPoint[],
@@ -32,6 +48,11 @@ export function project(
     .filter((p): p is { ts: number; value: number } => p.value !== null);
 
   if (series.length < MIN_POINTS) return null;
+
+  const observedSpanMs = series[series.length - 1].ts - series[0].ts;
+  const windowDurationMs = resetsAt ? resetsAt.getTime() - currentWindowStart.getTime() : 0;
+  const requiredSpanMs = Math.max(MIN_SPAN_MS, windowDurationMs * MIN_SPAN_FRACTION_OF_WINDOW);
+  if (observedSpanMs < requiredSpanMs) return null;
 
   const slopePerHour = linearSlopePerHour(series);
   if (slopePerHour === null || Math.abs(slopePerHour) < FLAT_SLOPE_THRESHOLD) return null;

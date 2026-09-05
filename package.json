@@ -11,9 +11,7 @@
   "engines": {
     "node": ">=20"
   },
-  "files": [
-    "dist"
-  ],
+  "files": ["dist"],
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "postbuild": "node -e \"require('fs').chmodSync('dist/bin.js', 0o755)\"",

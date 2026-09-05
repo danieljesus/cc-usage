@@ -56,6 +56,33 @@ describe('project', () => {
     expect(result?.slopePerHour).toBeCloseTo(10, 5);
   });
 
+  it('returns null when the points span too little real time (noise, not a trend)', () => {
+    // Three samples a minute apart, like a burst of manual polls — the kind
+    // of thing that produced a false "exhausts before reset" in practice.
+    const MINUTE = 60 * 1000;
+    const series = points([2, 2.5, 3], 0, MINUTE);
+    expect(project(series, (p) => p.fiveHour, windowStart, null)).toBeNull();
+  });
+
+  it('requires a longer observed span for a longer window, not just MIN_SPAN_MS', () => {
+    // 40 minutes clears the flat 15-minute floor but is nowhere near enough
+    // to extrapolate across a 7-day window (3% of a week is ~5 hours) — a
+    // single early tick shouldn't imply a weekly trend.
+    const MINUTE = 60 * 1000;
+    const series = points([2, 2.5, 3], 0, 20 * MINUTE);
+    const weeklyResetsAt = new Date(7 * 24 * HOUR);
+    const result = project(series, (p) => p.fiveHour, windowStart, weeklyResetsAt);
+    expect(result).toBeNull();
+  });
+
+  it('trusts the trend once the observed span covers enough of a long window', () => {
+    // Same shape, spread across 6 hours — past the ~5h (3% of 7 days) floor.
+    const series = points([2, 2.5, 3], 0, 3 * HOUR);
+    const weeklyResetsAt = new Date(7 * 24 * HOUR);
+    const result = project(series, (p) => p.fiveHour, windowStart, weeklyResetsAt);
+    expect(result).not.toBeNull();
+  });
+
   it('never projects an ETA for a falling series', () => {
     const series = points([80, 70, 60, 50], 0, HOUR);
     const result = project(series, (p) => p.fiveHour, windowStart, null);
