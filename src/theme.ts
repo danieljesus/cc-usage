@@ -48,11 +48,15 @@ export const VERDICT_ICON = {
   exhaustsBeforeReset: '🚨',
 } as const;
 
+// Plain geometric-shape glyphs, not emoji — same family arch-terminal uses
+// for its own status glyphs (◆, ⊘, ◐...). Unlike every 2-column emoji
+// above, these have no text/emoji presentation ambiguity at all: every
+// terminal renders a single Unicode dingbat at exactly 1 column, always.
+// Emoji here (⚡/💤 originally) kept losing their separating space to
+// Ink's padding math whenever a terminal disagreed with Ink by even one
+// column on how wide the glyph actually was — three rounds of that were
+// enough; state is color now (green/dim), not glyph shape.
 export const SESSION_ICON = {
-  // U+FE0F forces emoji (2-column) presentation — ⚡ alone defaults to text
-  // presentation in Unicode, and several terminals (Windows Terminal
-  // included) then render it 1-column-wide, which throws off column
-  // alignment against every other 2-column icon in this table.
-  working: '⚡️',
-  idle: '💤',
+  working: '●',
+  idle: '●',
 } as const;

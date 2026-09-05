@@ -1,6 +1,11 @@
 import { Box, Text } from 'ink';
-import type { SessionInfo } from '../data/sessions.js';
-import { ICON, INACTIVE, MUTED, SESSION_ICON } from '../theme.js';
+import type { SessionActivity, SessionInfo } from '../data/sessions.js';
+import { ICON, INACTIVE, MUTED, SESSION_ICON, SUCCESS } from '../theme.js';
+
+const ACTIVITY_COLOR: Record<SessionActivity, string> = {
+  working: SUCCESS,
+  idle: INACTIVE,
+};
 
 interface SessionsPanelProps {
   sessions: SessionInfo[];
@@ -13,11 +18,7 @@ interface SessionsPanelProps {
 // "5 HORAS") — these rows were missing it, starting flush with the
 // "SESIONES ACTIVAS" header above them instead of nested under it.
 const INDENT = 2;
-// Budget only — the icon is no longer rendered in a fixed-width Box (see
-// below), so this just sizes nameWidth/cwdWidth; the row's real width can
-// vary by a column depending on how wide the terminal actually renders the
-// icon.
-const ICON_COL = 3; // 2-cell emoji + 1 space
+const ICON_COL = 2; // 1-column dingbat + 1 space, both unambiguous
 const AGE_COL = 4;
 const GAP = 1;
 // Every other row in the app has natural slack below the box's width. This
@@ -29,6 +30,16 @@ const GAP = 1;
 // caused by an ambiguous-width emoji. Reserve a couple of columns so this
 // row is never flush with the edge.
 const ROW_MARGIN = 2;
+// Ink falls back to a full-terminal clear-and-redraw only when the frame's
+// total height reaches the terminal's row count; below that it does an
+// incremental erase-and-repaint whose line-count bookkeeping can desync
+// between frames of different heights (confirmed by reading ink's own
+// source — see git history). The session list is the one part of this
+// layout whose row count changes on its own, growing and shrinking with
+// however many Claude Code sessions happen to be running. Capping it keeps
+// the app's total height from drifting, rather than tracking every fork
+// and background agent 1:1.
+const MAX_VISIBLE_SESSIONS = 6;
 
 function minutesAgo(updatedAt: Date): string {
   const mins = Math.max(0, Math.floor((Date.now() - updatedAt.getTime()) / 60000));
@@ -43,6 +54,8 @@ export function SessionsPanel({ sessions, width }: SessionsPanelProps) {
   const nameWidth = Math.max(8, Math.floor(remaining / 3));
   const cwdWidth = remaining - nameWidth;
   const showCwd = cwdWidth >= 10;
+  const visible = sessions.slice(0, MAX_VISIBLE_SESSIONS);
+  const hiddenCount = sessions.length - visible.length;
 
   return (
     <Box flexDirection="column">
@@ -50,15 +63,12 @@ export function SessionsPanel({ sessions, width }: SessionsPanelProps) {
         {ICON.sessions} SESIONES ACTIVAS ({sessions.length})
       </Text>
       {sessions.length === 0 && <Text color={MUTED}>{'  '}ninguna sesión detectada</Text>}
-      {sessions.map((session) => (
+      {visible.map((session) => (
         <Box key={session.pid} marginLeft={INDENT}>
-          {/* A literal space here, not Box padding: Ink computes padding from its
-              own width estimate for the icon, and if that's even one column off
-              from how the terminal actually renders it, the padding it emits
-              can round down to nothing, leaving the icon touching the name with
-              no visible gap. A real space character in the string is unambiguous
-              — every terminal advances the cursor by exactly one column for it. */}
-          <Text>{SESSION_ICON[session.activity]} </Text>
+          {/* Literal space here, not Box padding — a real space character always
+              advances the cursor by exactly one column, with no dependency on
+              Ink's or the terminal's width estimate for the glyph before it. */}
+          <Text color={ACTIVITY_COLOR[session.activity]}>{SESSION_ICON[session.activity]} </Text>
           <Box width={nameWidth} marginRight={GAP}>
             <Text wrap="truncate-end">{session.name}</Text>
           </Box>
@@ -74,6 +84,11 @@ export function SessionsPanel({ sessions, width }: SessionsPanelProps) {
           </Box>
         </Box>
       ))}
+      {hiddenCount > 0 && (
+        <Text color={MUTED}>
+          {' '.repeat(INDENT)}+{hiddenCount} más
+        </Text>
+      )}
     </Box>
   );
 }

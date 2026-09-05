@@ -1,6 +1,7 @@
 import { readFile, readdir } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
+import { sanitizeWidth } from '../sanitize-width.js';
 
 const SESSIONS_DIR = join(homedir(), '.claude', 'sessions');
 const ROSTER_PATH = join(homedir(), '.claude', 'daemon', 'roster.json');
@@ -104,8 +105,11 @@ export async function readSessions(): Promise<SessionInfo[]> {
 
       out.push({
         pid: parsed.pid,
-        name: label || `pid ${parsed.pid}`,
-        cwd: shortenCwd(parsed.cwd),
+        // Sanitized here, at the data boundary, so every consumer of
+        // SessionInfo gets terminal-safe text — not just the one rendering
+        // path we happened to be looking at when we found the problem.
+        name: sanitizeWidth(label || `pid ${parsed.pid}`),
+        cwd: sanitizeWidth(shortenCwd(parsed.cwd)),
         activity: activityFor(parsed.status),
         updatedAt: new Date(updatedMs),
         background: worker !== undefined,

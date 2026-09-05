@@ -57,14 +57,15 @@ export function App() {
   const { exit } = useApp();
   const { isRawModeSupported } = useStdin();
   // Read stdout.columns directly on every render rather than mirroring it
-  // into React state. Ink itself listens for the terminal's 'resize' event
-  // and immediately forces a fresh render pass — before any state-update
-  // listener of ours would get a chance to run — so a cached column count
-  // is guaranteed to be one resize stale exactly when it matters most:
-  // Ink's own layout has already snapped to the new width, and a box still
-  // requesting the old one is what desyncs the redraw math and leaves the
-  // stale-line "staircase" behind. Reading live avoids that class of bug
-  // entirely — there's no cached value to be behind.
+  // into React state, so there's no cached copy of our own that could go
+  // stale. It still isn't enough on its own: Ink's internal 'resize'
+  // handler (ink.js) re-serializes the *already-rendered* Yoga/React tree —
+  // it does not re-invoke this component. This function's width= props to
+  // each Box stay exactly what they were computed as at the last real React
+  // render until something re-renders us, which without the listener below
+  // could be up to a second later (the next TICK_MS tick) — one guaranteed
+  // stale-width frame on every resize, over a root Ink has already resized
+  // underneath it.
   const { stdout } = useStdout();
   const columns = stdout.columns || DEFAULT_COLUMNS;
   const width = Math.max(MIN_WIDTH, columns - RIGHT_MARGIN);
@@ -137,9 +138,15 @@ export function App() {
 
     const pollTimer = setInterval(() => void poll(), POLL_MS);
     const tickTimer = setInterval(() => forceTick((n) => n + 1), TICK_MS);
+    // Forces an immediate React re-render on resize, closing the gap the
+    // comment above this component describes — without this, this
+    // component's width-dependent props stay stale until the next tick.
+    const onResize = () => forceTick((n) => n + 1);
+    process.stdout.on('resize', onResize);
     return () => {
       clearInterval(pollTimer);
       clearInterval(tickTimer);
+      process.stdout.off('resize', onResize);
     };
   }, []);
 

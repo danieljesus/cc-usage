@@ -76,16 +76,15 @@ describe('SessionsPanel', () => {
     expect(narrow.lastFrame()).not.toContain('~/some/path');
   });
 
-  it('shows the working/idle icon distinctly', () => {
-    const { lastFrame } = render(
-      <SessionsPanel
-        sessions={[session({ pid: 1, activity: 'working' }), session({ pid: 2, activity: 'idle' })]}
-        width={60}
-      />,
-    );
-    const frame = lastFrame() ?? '';
-    expect(frame).toContain('⚡');
-    expect(frame).toContain('💤');
+  it('renders the activity marker for both working and idle sessions', () => {
+    // Working/idle is communicated by the marker's color (checked in the
+    // app visually — ink-testing-library's lastFrame() strips ANSI color,
+    // so it can't be asserted here), not by glyph shape: both activities
+    // render the same unambiguous single-column bullet.
+    for (const activity of ['working', 'idle'] as const) {
+      const { lastFrame } = render(<SessionsPanel sessions={[session({ activity })]} width={60} />);
+      expect(lastFrame() ?? '').toContain('●');
+    }
   });
 
   it('always puts a literal space between the icon and the name', () => {
@@ -100,7 +99,7 @@ describe('SessionsPanel', () => {
         <SessionsPanel sessions={[session({ activity, name: 'my-session' })]} width={60} />,
       );
       const row = (lastFrame() ?? '').split('\n')[1];
-      expect(row).toMatch(/(⚡️?|💤) my-session/);
+      expect(row).toMatch(/● my-session/);
     }
   });
 
@@ -109,5 +108,25 @@ describe('SessionsPanel', () => {
       <SessionsPanel sessions={[session({ updatedAt: new Date() })]} width={60} />,
     );
     expect(lastFrame()).toContain('<1m');
+  });
+
+  it('caps visible session rows and summarizes the rest', () => {
+    // The session count is the one thing in this layout that changes the
+    // app's total rendered height on its own — Ink only guards against a
+    // desynced incremental redraw once total height reaches the terminal's
+    // row count, so an unbounded list risked crossing that threshold on
+    // every session added or removed. Capping keeps this panel's height
+    // constant past that point regardless of how many sessions are live.
+    const many = Array.from({ length: 10 }, (_, i) => session({ pid: i }));
+    const { lastFrame } = render(<SessionsPanel sessions={many} width={60} />);
+    const frame = lastFrame() ?? '';
+    expect(frame).toContain('SESIONES ACTIVAS (10)');
+    expect(frame).toContain('+4 más');
+    expect(frame.split('\n')).toHaveLength(1 + 6 + 1); // header + 6 rows + summary
+  });
+
+  it('shows no summary line when every session fits', () => {
+    const { lastFrame } = render(<SessionsPanel sessions={[session()]} width={60} />);
+    expect(lastFrame() ?? '').not.toContain('más');
   });
 });
