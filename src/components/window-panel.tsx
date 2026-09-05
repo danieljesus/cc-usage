@@ -79,7 +79,8 @@ export function WindowPanel({
         <Text color={MUTED}>
           {'  '}
           {ICON.resetClock} renueva {reset}
-          {remaining ? `  ·  faltan ${remaining}` : ''}
+          {/* ASCII '-', not '·' — see app.tsx's top comment for why. */}
+          {remaining ? `  -  faltan ${remaining}` : ''}
         </Text>
       )}
       {!compact && sparklineValues && sparklineValues.length >= 2 && (

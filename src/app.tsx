@@ -13,6 +13,25 @@ import { age } from './format.js';
 import { project } from './projection.js';
 import { ICON, MUTED, STATUS_ICON } from './theme.js';
 
+/**
+ * ROOT CAUSE, finally confirmed empirically (not from a Windows Terminal
+ * screenshot — from feeding this app's actual byte output into a real
+ * terminal emulator, xterm.js, and reading its buffer/cursor position
+ * directly): '·' (MIDDLE DOT, U+00B7) and '—' (EM DASH, U+2014) are Unicode
+ * East Asian Width "Ambiguous". `string-width` (what Ink uses) measures
+ * them as 1 column; xterm.js measures them as 2 — verified by writing
+ * "a·b" into a blank terminal and reading cursorX afterward (landed on 4,
+ * not 3). Every terminal is free to pick either convention for Ambiguous
+ * characters, and disagreement here is exactly what pushes a row's real
+ * rendered width past what this file budgets, triggering an unwanted
+ * auto-wrap that desyncs Ink's redraw line-count bookkeeping — the
+ * "staircase" of stale border fragments chased across many earlier fixes
+ * in this file's history. '·' appeared on nearly every frame (the
+ * "CC·USAGE" wordmark alone, plus the header separator), which is why nothing
+ * short of removing it ever fully closed the bug. Every separator below is
+ * therefore plain ASCII ('-'), not decorative Unicode — same reasoning
+ * behind SESSION_ICON in theme.ts, which had the identical problem with '●'.
+ */
 const DEFAULT_COLUMNS = 80;
 
 const POLL_MS = 30_000;
@@ -185,10 +204,10 @@ export function App() {
   return (
     <GradientBox width={width}>
       <Box justifyContent="space-between">
-        <GradientText>CC·USAGE</GradientText>
+        <GradientText>CC-USAGE</GradientText>
         <Text color={MUTED}>
-          {STATUS_ICON[freshness]} {freshness === 'live' ? 'live' : freshness} ·{' '}
-          {age(lastFetchedAt) ?? '—'}
+          {STATUS_ICON[freshness]} {freshness === 'live' ? 'live' : freshness} -{' '}
+          {age(lastFetchedAt) ?? '-'}
         </Text>
       </Box>
       <Box height={1} />
@@ -249,7 +268,7 @@ export function App() {
 
       <Box height={1} />
       <Text color={MUTED}>
-        {isRawModeSupported ? 'q salir · r refrescar ya' : 'ctrl+c para salir'}
+        {isRawModeSupported ? 'q salir - r refrescar ya' : 'ctrl+c para salir'}
       </Text>
     </GradientBox>
   );
