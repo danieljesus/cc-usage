@@ -8,6 +8,11 @@ interface SessionsPanelProps {
   width: number;
 }
 
+// Matches the 2-space indent every sub-row elsewhere in the app uses to read
+// as nested under its header (WindowPanel's "renueva"/sparkline lines under
+// "5 HORAS") — these rows were missing it, starting flush with the
+// "SESIONES ACTIVAS" header above them instead of nested under it.
+const INDENT = 2;
 const ICON_COL = 3; // 2-cell emoji + 1 space
 const AGE_COL = 4;
 const GAP = 1;
@@ -30,7 +35,7 @@ export function SessionsPanel({ sessions, width }: SessionsPanelProps) {
   // Name gets a third of what's left after the icon and age columns, cwd gets
   // the rest — and is dropped below a minimum, rather than rendered at zero
   // width, once the terminal is too narrow for both.
-  const remaining = Math.max(0, width - ICON_COL - AGE_COL - GAP * 2 - ROW_MARGIN);
+  const remaining = Math.max(0, width - INDENT - ICON_COL - AGE_COL - GAP * 2 - ROW_MARGIN);
   const nameWidth = Math.max(8, Math.floor(remaining / 3));
   const cwdWidth = remaining - nameWidth;
   const showCwd = cwdWidth >= 10;
@@ -40,9 +45,9 @@ export function SessionsPanel({ sessions, width }: SessionsPanelProps) {
       <Text bold color={INACTIVE}>
         {ICON.sessions} SESIONES ACTIVAS ({sessions.length})
       </Text>
-      {sessions.length === 0 && <Text color={MUTED}> ninguna sesión detectada</Text>}
+      {sessions.length === 0 && <Text color={MUTED}>{'  '}ninguna sesión detectada</Text>}
       {sessions.map((session) => (
-        <Box key={session.pid}>
+        <Box key={session.pid} marginLeft={INDENT}>
           <Box width={ICON_COL}>
             <Text>{SESSION_ICON[session.activity]}</Text>
           </Box>
