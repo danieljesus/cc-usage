@@ -13,6 +13,10 @@ interface SessionsPanelProps {
 // "5 HORAS") — these rows were missing it, starting flush with the
 // "SESIONES ACTIVAS" header above them instead of nested under it.
 const INDENT = 2;
+// Budget only — the icon is no longer rendered in a fixed-width Box (see
+// below), so this just sizes nameWidth/cwdWidth; the row's real width can
+// vary by a column depending on how wide the terminal actually renders the
+// icon.
 const ICON_COL = 3; // 2-cell emoji + 1 space
 const AGE_COL = 4;
 const GAP = 1;
@@ -48,9 +52,13 @@ export function SessionsPanel({ sessions, width }: SessionsPanelProps) {
       {sessions.length === 0 && <Text color={MUTED}>{'  '}ninguna sesión detectada</Text>}
       {sessions.map((session) => (
         <Box key={session.pid} marginLeft={INDENT}>
-          <Box width={ICON_COL}>
-            <Text>{SESSION_ICON[session.activity]}</Text>
-          </Box>
+          {/* A literal space here, not Box padding: Ink computes padding from its
+              own width estimate for the icon, and if that's even one column off
+              from how the terminal actually renders it, the padding it emits
+              can round down to nothing, leaving the icon touching the name with
+              no visible gap. A real space character in the string is unambiguous
+              — every terminal advances the cursor by exactly one column for it. */}
+          <Text>{SESSION_ICON[session.activity]} </Text>
           <Box width={nameWidth} marginRight={GAP}>
             <Text wrap="truncate-end">{session.name}</Text>
           </Box>

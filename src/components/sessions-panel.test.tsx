@@ -88,6 +88,22 @@ describe('SessionsPanel', () => {
     expect(frame).toContain('💤');
   });
 
+  it('always puts a literal space between the icon and the name', () => {
+    // Regression test: the icon used to sit in a fixed-width Box that let
+    // Ink compute the gap as padding. Ink's own width estimate for the icon
+    // and the terminal's actual rendered width don't always agree, and when
+    // they're off by as little as one column, the computed padding rounds
+    // down to zero — the name ends up touching the icon with no visible
+    // gap. A literal space byte in the string can't be rounded away.
+    for (const activity of ['working', 'idle'] as const) {
+      const { lastFrame } = render(
+        <SessionsPanel sessions={[session({ activity, name: 'my-session' })]} width={60} />,
+      );
+      const row = (lastFrame() ?? '').split('\n')[1];
+      expect(row).toMatch(/(⚡️?|💤) my-session/);
+    }
+  });
+
   it('shows "<1m" for a session updated less than a minute ago', () => {
     const { lastFrame } = render(
       <SessionsPanel sessions={[session({ updatedAt: new Date() })]} width={60} />,
