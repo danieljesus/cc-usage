@@ -1,0 +1,37 @@
+{
+  "name": "cc-usage",
+  "private": true,
+  "version": "0.1.0",
+  "description": "cc-usage — near-real-time monitor for Claude Code's 5h/7d usage windows.",
+  "license": "MIT",
+  "type": "module",
+  "bin": {
+    "cc-usage": "./dist/bin.js"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "files": ["dist"],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "postbuild": "node -e \"require('fs').chmodSync('dist/bin.js', 0o755)\"",
+    "dev": "tsc -p tsconfig.json --watch",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run",
+    "lint": "biome check .",
+    "lint:fix": "biome check --write ."
+  },
+  "dependencies": {
+    "ink": "^5.1.0",
+    "react": "^18.3.1",
+    "string-width": "^7.2.0"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^1.9.4",
+    "@types/node": "^22.10.5",
+    "@types/react": "^18.3.12",
+    "ink-testing-library": "^4.0.0",
+    "typescript": "^5.7.2",
+    "vitest": "^2.1.8"
+  }
+}
