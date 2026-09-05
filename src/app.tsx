@@ -1,4 +1,4 @@
-import { Box, Text, useApp, useInput, useStdin } from 'ink';
+import { Box, Text, useApp, useInput, useStdin, useStdout } from 'ink';
 import { useEffect, useState } from 'react';
 import { GradientBox } from './components/gradient-box.js';
 import { GradientText } from './components/gradient-text.js';
@@ -10,9 +10,10 @@ import { type SessionInfo, readSessions } from './data/sessions.js';
 import { readSnapshot } from './data/snapshot.js';
 import { type UsageSnapshot, fetchUsage } from './data/usage-api.js';
 import { age } from './format.js';
-import { useTerminalColumns } from './hooks/use-terminal-columns.js';
 import { project } from './projection.js';
 import { ICON, MUTED, STATUS_ICON } from './theme.js';
+
+const DEFAULT_COLUMNS = 80;
 
 const POLL_MS = 30_000;
 const TICK_MS = 1_000;
@@ -55,7 +56,17 @@ function seriesFor(points: HistoryPoint[], pick: (p: HistoryPoint) => number | n
 export function App() {
   const { exit } = useApp();
   const { isRawModeSupported } = useStdin();
-  const columns = useTerminalColumns();
+  // Read stdout.columns directly on every render rather than mirroring it
+  // into React state. Ink itself listens for the terminal's 'resize' event
+  // and immediately forces a fresh render pass — before any state-update
+  // listener of ours would get a chance to run — so a cached column count
+  // is guaranteed to be one resize stale exactly when it matters most:
+  // Ink's own layout has already snapped to the new width, and a box still
+  // requesting the old one is what desyncs the redraw math and leaves the
+  // stale-line "staircase" behind. Reading live avoids that class of bug
+  // entirely — there's no cached value to be behind.
+  const { stdout } = useStdout();
+  const columns = stdout.columns || DEFAULT_COLUMNS;
   const width = Math.max(MIN_WIDTH, columns - RIGHT_MARGIN);
   const compact = width < 60;
   const contentWidth = width - 4;
