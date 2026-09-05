@@ -4,14 +4,28 @@ import { ICON, INACTIVE, MUTED, SESSION_ICON } from '../theme.js';
 
 interface SessionsPanelProps {
   sessions: SessionInfo[];
+  /** Available content width in columns, so rows never overflow the box. */
+  width: number;
 }
+
+const ICON_COL = 3; // 2-cell emoji + 1 space
+const AGE_COL = 4;
+const GAP = 1;
 
 function minutesAgo(updatedAt: Date): string {
   const mins = Math.max(0, Math.floor((Date.now() - updatedAt.getTime()) / 60000));
   return mins === 0 ? '<1m' : `${mins}m`;
 }
 
-export function SessionsPanel({ sessions }: SessionsPanelProps) {
+export function SessionsPanel({ sessions, width }: SessionsPanelProps) {
+  // Name gets a third of what's left after the icon and age columns, cwd gets
+  // the rest — and is dropped below a minimum, rather than rendered at zero
+  // width, once the terminal is too narrow for both.
+  const remaining = Math.max(0, width - ICON_COL - AGE_COL - GAP * 2);
+  const nameWidth = Math.max(8, Math.floor(remaining / 3));
+  const cwdWidth = remaining - nameWidth;
+  const showCwd = cwdWidth >= 10;
+
   return (
     <Box flexDirection="column">
       <Text bold color={INACTIVE}>
@@ -20,16 +34,22 @@ export function SessionsPanel({ sessions }: SessionsPanelProps) {
       {sessions.length === 0 && <Text color={MUTED}> ninguna sesión detectada</Text>}
       {sessions.map((session) => (
         <Box key={session.pid}>
-          <Text> {SESSION_ICON[session.activity]} </Text>
-          <Box width={28}>
+          <Box width={ICON_COL}>
+            <Text>{SESSION_ICON[session.activity]}</Text>
+          </Box>
+          <Box width={nameWidth} marginRight={GAP}>
             <Text wrap="truncate-end">{session.name}</Text>
           </Box>
-          <Box width={30}>
-            <Text color={MUTED} wrap="truncate-end">
-              {session.cwd}
-            </Text>
+          {showCwd && (
+            <Box width={cwdWidth} marginRight={GAP}>
+              <Text color={MUTED} wrap="truncate-end">
+                {session.cwd}
+              </Text>
+            </Box>
+          )}
+          <Box width={AGE_COL} justifyContent="flex-end">
+            <Text color={MUTED}>{minutesAgo(session.updatedAt)}</Text>
           </Box>
-          <Text color={MUTED}>{minutesAgo(session.updatedAt)}</Text>
         </Box>
       ))}
     </Box>

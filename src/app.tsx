@@ -1,4 +1,4 @@
-import { Box, Text, useApp, useInput, useStdout } from 'ink';
+import { Box, Text, useApp, useInput, useStdin, useStdout } from 'ink';
 import { useEffect, useState } from 'react';
 import { GradientBox } from './components/gradient-box.js';
 import { GradientText } from './components/gradient-text.js';
@@ -35,6 +35,7 @@ function seriesFor(points: HistoryPoint[], pick: (p: HistoryPoint) => number | n
 export function App() {
   const { exit } = useApp();
   const { stdout } = useStdout();
+  const { isRawModeSupported } = useStdin();
   const width = Math.min(66, Math.max(50, stdout?.columns ?? 66));
   const compact = width < 60;
 
@@ -49,10 +50,16 @@ export function App() {
   const [history, setHistory] = useState<HistoryPoint[]>([]);
   const [, forceTick] = useState(0);
 
-  useInput((input, key) => {
-    if (input === 'q' || (key.ctrl && input === 'c')) exit();
-    if (input === 'r') void poll();
-  });
+  // isActive must be the strict boolean `false` to skip Ink's raw-mode listener —
+  // it checks `=== false`, and `isRawModeSupported` comes through as `undefined`
+  // (not `false`) when stdin isn't a TTY, so the loose value alone doesn't stop it.
+  useInput(
+    (input, key) => {
+      if (input === 'q' || (key.ctrl && input === 'c')) exit();
+      if (input === 'r') void poll();
+    },
+    { isActive: isRawModeSupported === true },
+  );
 
   async function poll() {
     const [creds, snap, liveSessions] = await Promise.all([
@@ -174,10 +181,12 @@ export function App() {
       )}
 
       <Box height={1} />
-      <SessionsPanel sessions={sessions} />
+      <SessionsPanel sessions={sessions} width={width - 4} />
 
       <Box height={1} />
-      <Text color={MUTED}>q salir · r refrescar ya</Text>
+      <Text color={MUTED}>
+        {isRawModeSupported ? 'q salir · r refrescar ya' : 'ctrl+c para salir'}
+      </Text>
     </GradientBox>
   );
 }
