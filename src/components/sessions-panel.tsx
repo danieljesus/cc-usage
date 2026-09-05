@@ -11,6 +11,15 @@ interface SessionsPanelProps {
 const ICON_COL = 3; // 2-cell emoji + 1 space
 const AGE_COL = 4;
 const GAP = 1;
+// Every other row in the app has natural slack below the box's width. This
+// one didn't — nameWidth + cwdWidth was sized to sum to exactly what's left,
+// so the row's total landed on precisely `width` with zero margin. That's
+// fragile: the same class of bug that produced the redraw "staircase"
+// elsewhere (a row exactly as wide as its container, one glyph-width
+// surprise away from tipping over) but self-inflicted here rather than
+// caused by an ambiguous-width emoji. Reserve a couple of columns so this
+// row is never flush with the edge.
+const ROW_MARGIN = 2;
 
 function minutesAgo(updatedAt: Date): string {
   const mins = Math.max(0, Math.floor((Date.now() - updatedAt.getTime()) / 60000));
@@ -21,7 +30,7 @@ export function SessionsPanel({ sessions, width }: SessionsPanelProps) {
   // Name gets a third of what's left after the icon and age columns, cwd gets
   // the rest — and is dropped below a minimum, rather than rendered at zero
   // width, once the terminal is too narrow for both.
-  const remaining = Math.max(0, width - ICON_COL - AGE_COL - GAP * 2);
+  const remaining = Math.max(0, width - ICON_COL - AGE_COL - GAP * 2 - ROW_MARGIN);
   const nameWidth = Math.max(8, Math.floor(remaining / 3));
   const cwdWidth = remaining - nameWidth;
   const showCwd = cwdWidth >= 10;
