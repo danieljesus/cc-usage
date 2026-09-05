@@ -16,7 +16,7 @@ cc-usage
 - Sparkline y proyección de agotamiento (regresión lineal sobre el histórico local) con veredicto: llegas con margen / ajustado / agotas antes del reset.
 - Sesiones de Claude Code activas ahora mismo (`~/.claude/sessions/*.json`).
 
-`q` sale, `r` refresca ya. Fuera de una TTY real (pipe, wrapper) el teclado se desactiva solo; `Ctrl+C` siempre corta.
+`cc-usage` toma la pantalla completa (buffer alternativo, como `vim`/`htop`): el propio comando desaparece de la vista y al salir vuelves exactamente a donde estabas en el shell. `q` sale, `r` refresca ya. Fuera de una TTY real (pipe, wrapper) el teclado se desactiva solo y no se activa la pantalla completa; `Ctrl+C` siempre corta.
 
 ## De dónde salen los datos
 
