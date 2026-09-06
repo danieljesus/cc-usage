@@ -1,7 +1,7 @@
 import { readFile } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
-import type { UsageSnapshot, UsageWindow } from './usage-api.js';
+import type { UsageWindow } from './usage-api.js';
 
 const SNAPSHOT_PATH = join(homedir(), '.claude', 'usage-snapshot.json');
 

@@ -4,7 +4,7 @@
  * used for chrome (borders, titles), never for anything that encodes a
  * value. See health-gradient.ts for the meter fill, which does.
  */
-import { type Rgb, dimHex, hexToRgb, lerp, rgbToHex } from './color.js';
+import { dimHex, hexToRgb, lerp, type Rgb, rgbToHex } from './color.js';
 
 const STOPS: Rgb[] = ['#00eaff', '#7a5cff', '#ff2bd6', '#ff3d81'].map(hexToRgb);
 

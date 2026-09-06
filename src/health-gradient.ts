@@ -3,7 +3,7 @@
  * used" — the same three stops as the old statusline's three-step version,
  * interpolated continuously instead of jumping at 50%/100%.
  */
-import { type Rgb, hexToRgb, lerpRgb, rgbToHex } from './color.js';
+import { hexToRgb, lerpRgb, type Rgb, rgbToHex } from './color.js';
 
 const STOPS: { at: number; color: Rgb }[] = [
   { at: 0, color: hexToRgb('#2ecc40') },

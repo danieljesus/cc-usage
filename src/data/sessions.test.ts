@@ -6,7 +6,7 @@ vi.mock('node:fs/promises', () => ({
   readdir: vi.fn(),
 }));
 
-import { readFile, readdir } from 'node:fs/promises';
+import { readdir, readFile } from 'node:fs/promises';
 import { readSessions } from './sessions.js';
 
 const NOW = 1_800_000_000_000;
@@ -50,7 +50,7 @@ function stubSessionFiles(files: Record<string, string>) {
   vi.mocked(readFile).mockImplementation(async (path) => {
     const name = String(path).split(/[/\\]/).pop() ?? '';
     if (name in files) return files[name];
-    return original?.(path as never) as never;
+    return original?.(path as never, undefined as never) as never;
   });
 }
 

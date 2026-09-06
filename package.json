@@ -9,30 +9,33 @@
     "cc-usage": "./dist/bin.js"
   },
   "engines": {
-    "node": ">=20"
+    "node": ">=22"
   },
-  "files": ["dist"],
+  "packageManager": "pnpm@12.3.4",
+  "files": [
+    "dist"
+  ],
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "postbuild": "node -e \"require('fs').chmodSync('dist/bin.js', 0o755)\"",
     "dev": "tsc -p tsconfig.json --watch",
-    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.test.json",
     "test": "vitest run",
     "lint": "biome check .",
     "lint:fix": "biome check --write ."
   },
   "dependencies": {
-    "get-east-asian-width": "^1.6.0",
     "ink": "^7.1.1",
     "react": "^19.2.0",
-    "string-width": "^7.2.0"
+    "string-width": "^8.2.2"
   },
   "devDependencies": {
-    "@biomejs/biome": "^1.9.4",
-    "@types/node": "^22.10.5",
+    "@biomejs/biome": "^2.5.12",
+    "@types/node": "^26.4.1",
     "@types/react": "^19.2.0",
     "ink-testing-library": "^4.0.0",
-    "typescript": "^5.7.2",
-    "vitest": "^2.1.8"
+    "typescript": "^7.0.2",
+    "vite": "^8.2.2",
+    "vitest": "^5.0.0"
   }
 }
