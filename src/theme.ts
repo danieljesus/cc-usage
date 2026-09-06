@@ -7,18 +7,35 @@ export const ERROR = 'red';
 // light against the background at full gray. Copied from arch-terminal.
 export const INACTIVE = '#4b5563';
 
-export const SELECTION_CURSOR = '❯';
-
 /** Section icons — kept as one named table so they're not scattered loose through JSX. */
+// Emoji restored after TWO independent real measurements, not a guess —
+// each one catches a different bug class, and a glyph has to pass both:
+//
+// 1. Real-terminal width (`scripts/measure-glyph-widths.mjs`): writes each
+//    candidate to a live terminal and reads its actual cursor advance back
+//    via DSR (`\x1b[6n`), compared against what `string-width` (what Ink's
+//    layout measures with) computes. Run in a real Windows Terminal window
+//    (`capture-out/glyph-widths.txt`, WT profile
+//    `{3ad42e7b-e073-5f3e-ac57-1c259ffa86a8}`, 2026-09-06) — a spawned
+//    window, not proven identical to every profile this app runs in, so a
+//    fragment reappearing on a specific machine means re-running this
+//    script there and dropping that one icon back to ASCII.
+// 2. Ink's own internal grid writer (no terminal involved at all — pure
+//    `ink-testing-library`): render `<Text>{icon} </Text><Text>NAME</Text>`
+//    in a bare Box and check the output is exactly `"{icon} NAME"`, one
+//    space. This is the one that actually caught something: `🖥️` (desktop
+//    computer + VS16) silently ate the space (`"🖥️NAME"`), and `⚡`
+//    (lightning, no VS16) doubled it (`"⚡  NAME"`) — both **before
+//    anything reaches a terminal**, entirely inside Ink's own Yoga/Output
+//    layer. Both passed check #1 (real width 2, matching what Ink budgets)
+//    yet were still broken — proof the original "terminal disagrees with
+//    Ink" theory, while real for `·`/`—`, was never the full story for
+//    every glyph. `💻` and `🏃` below are their replacements: same
+//    real-world width (2, confirmed both ways), no grid-writer bug.
+//
+// Every other icon here passed both checks in its ORIGINAL form (including
+// trailing U+FE0F where present) and needed no substitution.
 export const ICON = {
-  // U+FE0F: same ambiguous-width risk as ⚡ below — ⏳ is a BMP Miscellaneous
-  // Symbols character, the exact block where terminal font fallback most
-  // often disagrees with Ink about text vs. emoji presentation. This one
-  // sits on the box's leftmost column of every "5 HORAS" row, so a 1-column
-  // mismatch here doesn't just misalign — it can push a whole row's content
-  // to exactly the terminal's width and trigger an unwanted auto-wrap,
-  // which desyncs Ink's redraw cursor math and leaves stale line fragments
-  // behind on every subsequent frame (the "staircase" artifact).
   fiveHour: '⏳️',
   weekly: '📅',
   opus: '🧠',
@@ -26,10 +43,7 @@ export const ICON = {
   credits: '💳',
   burnRate: '🔥',
   sparkline: '📊',
-  sessions: '🖥️',
-  // ⏰ rather than a specific clock-face-at-N-o'clock glyph (🕕 etc.) —
-  // those are uncommon enough that several terminal emoji fonts (Windows
-  // Terminal included) fall back to a generic placeholder glyph for them.
+  sessions: '💻', // was 🖥️ — ate its trailing space in Ink's own output buffer, see above
   resetClock: '⏰️',
 } as const;
 
@@ -42,21 +56,12 @@ export const STATUS_ICON = {
 
 /** Projection verdicts for a usage window relative to its reset time. */
 export const VERDICT_ICON = {
-  // Same BMP-ambiguity fix as ⏳/⚡ — ✅ is Dingbats block.
   comfortable: '✅️',
   tight: '⚠️',
   exhaustsBeforeReset: '🚨',
 } as const;
 
-// Plain geometric-shape glyphs, not emoji — same family arch-terminal uses
-// for its own status glyphs (◆, ⊘, ◐...). Unlike every 2-column emoji
-// above, these have no text/emoji presentation ambiguity at all: every
-// terminal renders a single Unicode dingbat at exactly 1 column, always.
-// Emoji here (⚡/💤 originally) kept losing their separating space to
-// Ink's padding math whenever a terminal disagreed with Ink by even one
-// column on how wide the glyph actually was — three rounds of that were
-// enough; state is color now (green/dim), not glyph shape.
 export const SESSION_ICON = {
-  working: '●',
-  idle: '●',
+  working: '🏃', // was ⚡ — doubled its trailing space in Ink's own output buffer, see ICON above
+  idle: '💤',
 } as const;

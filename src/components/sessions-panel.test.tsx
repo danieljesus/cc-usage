@@ -2,6 +2,7 @@ import { render } from 'ink-testing-library';
 import stringWidth from 'string-width';
 import { describe, expect, it } from 'vitest';
 import type { SessionInfo } from '../data/sessions.js';
+import { SESSION_ICON } from '../theme.js';
 import { SessionsPanel } from './sessions-panel.js';
 
 function session(overrides: Partial<SessionInfo> = {}): SessionInfo {
@@ -77,13 +78,11 @@ describe('SessionsPanel', () => {
   });
 
   it('renders the activity marker for both working and idle sessions', () => {
-    // Working/idle is communicated by the marker's color (checked in the
-    // app visually — ink-testing-library's lastFrame() strips ANSI color,
-    // so it can't be asserted here), not by glyph shape: both activities
-    // render the same unambiguous single-column bullet.
+    // Working/idle each get their own glyph now (⚡/💤, restored after a
+    // real-terminal width measurement — see theme.ts) plus color.
     for (const activity of ['working', 'idle'] as const) {
       const { lastFrame } = render(<SessionsPanel sessions={[session({ activity })]} width={60} />);
-      expect(lastFrame() ?? '').toContain('●');
+      expect(lastFrame() ?? '').toContain(SESSION_ICON[activity]);
     }
   });
 
@@ -99,7 +98,7 @@ describe('SessionsPanel', () => {
         <SessionsPanel sessions={[session({ activity, name: 'my-session' })]} width={60} />,
       );
       const row = (lastFrame() ?? '').split('\n')[1];
-      expect(row).toMatch(/● my-session/);
+      expect(row).toContain(`${SESSION_ICON[activity]} my-session`);
     }
   });
 

@@ -18,7 +18,7 @@ interface SessionsPanelProps {
 // "5 HORAS") — these rows were missing it, starting flush with the
 // "SESIONES ACTIVAS" header above them instead of nested under it.
 const INDENT = 2;
-const ICON_COL = 2; // 1-column dingbat + 1 space, both unambiguous
+const ICON_COL = 3; // 2-column emoji (measured, see theme.ts) + 1 space
 const AGE_COL = 4;
 const GAP = 1;
 // Every other row in the app has natural slack below the box's width. This
