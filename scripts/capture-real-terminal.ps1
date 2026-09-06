@@ -33,6 +33,7 @@ public class Win32Capture {
     [DllImport("user32.dll")] public static extern bool GetWindowRect(IntPtr hWnd, out RECT lpRect);
     [DllImport("user32.dll")] public static extern bool SetForegroundWindow(IntPtr hWnd);
     [DllImport("user32.dll")] public static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
+    [DllImport("user32.dll")] public static extern bool PostMessage(IntPtr hWnd, uint Msg, IntPtr wParam, IntPtr lParam);
     public struct RECT { public int Left, Top, Right, Bottom; }
 }
 "@
@@ -89,6 +90,12 @@ foreach ($s in $Seconds) {
   Write-Host "t=${s}s -> $outPath"
 }
 
-Write-Host "Closing capture window (PID $($proc.Id))..."
-Stop-Process -Id $proc.Id -Force -ErrorAction SilentlyContinue
+# WM_CLOSE to the specific window HANDLE, never Stop-Process on the PID:
+# Windows Terminal can consolidate several windows into one shared process
+# (the "monarch" model) — killing the process by PID risks closing every
+# Windows Terminal window the user has open, not just this script's own.
+# Posting WM_CLOSE is exactly what clicking that one window's X button does:
+# it only ever closes this window, regardless of the process model.
+Write-Host "Closing capture window (handle $($proc.MainWindowHandle))..."
+[Win32Capture]::PostMessage($proc.MainWindowHandle, 0x0010, [IntPtr]::Zero, [IntPtr]::Zero) | Out-Null
 Write-Host "Done."
