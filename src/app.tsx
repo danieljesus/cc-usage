@@ -10,7 +10,9 @@ import { type SessionInfo, readSessions } from './data/sessions.js';
 import { readSnapshot } from './data/snapshot.js';
 import { type UsageSnapshot, fetchUsage } from './data/usage-api.js';
 import { age } from './format.js';
+import { resetInkBookkeeping } from './ink-handle.js';
 import { project } from './projection.js';
+import { CLEAR_SCREEN } from './terminal-escapes.js';
 import { ICON, MUTED, STATUS_ICON } from './theme.js';
 
 /**
@@ -157,10 +159,20 @@ export function App() {
 
     const pollTimer = setInterval(() => void poll(), POLL_MS);
     const tickTimer = setInterval(() => forceTick((n) => n + 1), TICK_MS);
-    // Forces an immediate React re-render on resize, closing the gap the
-    // comment above this component describes — without this, this
-    // component's width-dependent props stay stale until the next tick.
-    const onResize = () => forceTick((n) => n + 1);
+    // The clear has to happen from here, not from bin.tsx before render() —
+    // see bin.tsx's comment for the full byte-level evidence. Effects commit
+    // strictly after Ink's own initial render/mount, so this handler is
+    // guaranteed to run after Ink's internal resize repaint (which uses the
+    // stale, pre-resize layout and is what actually overflows/scrolls the
+    // terminal), and before the real re-render below repaints with the
+    // current width. Order matters: reset Ink's bookkeeping and wipe the
+    // screen (scrollback included) first, so the only thing landing after
+    // the wipe is a correct frame — never Ink's own stale one.
+    const onResize = () => {
+      resetInkBookkeeping();
+      process.stdout.write(CLEAR_SCREEN);
+      forceTick((n) => n + 1);
+    };
     process.stdout.on('resize', onResize);
     return () => {
       clearInterval(pollTimer);

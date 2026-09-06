@@ -1,10 +1,8 @@
 #!/usr/bin/env node
 import { render } from 'ink';
 import { App } from './app.js';
-
-const ENTER_ALT_SCREEN = '\x1b[?1049h';
-const EXIT_ALT_SCREEN = '\x1b[?1049l';
-const CLEAR_SCREEN = '\x1b[2J\x1b[H';
+import { setInkInstance } from './ink-handle.js';
+import { ENTER_ALT_SCREEN, EXIT_ALT_SCREEN } from './terminal-escapes.js';
 
 /**
  * Alternate screen buffer: cc-usage takes over the terminal viewport like
@@ -34,38 +32,39 @@ process.on('SIGTERM', () => {
 });
 
 /**
- * Ink's own redraw is incremental: it erases exactly as many lines as its
- * last frame had and repaints on top. That bookkeeping can desync from what
- * the terminal actually shows — several concrete mechanisms for this were
- * found by reading ink's own source (see git history) — and once it does, a
- * fragment of an old frame (usually a stale border segment) is left behind
- * for good, since nothing downstream knows that cell is dirty. This is the
- * backstop for the *width*-changing case specifically: on every resize that
- * actually changes the column count, before Ink gets a chance to do its own
- * incremental erase, wipe the whole alt screen and put the cursor at the
- * top. Whatever Ink draws next lands on a verified-blank buffer, independent
- * of whatever its internal line count believes. Registered before
- * `render()` so it runs before Ink's own 'resize' listener (Node calls
- * listeners in registration order).
+ * The resize-clear itself lives in app.tsx, not here — confirmed via a real
+ * conpty byte capture (feeding cc-usage's actual output stream into a pty
+ * and resizing it, then reading the raw bytes) that a `process.stdout.on
+ * ('resize', ...)` listener registered here, before render(), still isn't
+ * early enough to win: Ink has its own internal resize handling that
+ * re-serializes the *already-rendered* Yoga/React tree straight to the
+ * terminal at the new dimensions, without re-invoking this component. That
+ * repaint uses layout computed for the OLD width, so it overflows the new
+ * (narrower) terminal and wraps — and it happens regardless of a listener
+ * registered before render(), which only wins the ordering race against
+ * Ink's *own* 'resize' listener, not against this internal repaint path.
  *
- * Gated on columns actually changing, not on every 'resize' event: a
- * row-only resize (window height changed, width didn't) leaves this
- * process's rendered output byte-for-byte identical to the last frame, and
- * Ink's onRender skips repainting entirely when that's true (ink.js:
- * `output !== this.lastOutput`) — clearing unconditionally there blanks the
- * screen and nothing ever repaints it until the next unrelated tick.
+ * The captured byte stream showed the sequence precisely: our old clear+home
+ * here, immediately followed by that malformed stale-width frame — undoing
+ * the clear before anything correct ever reached the terminal. Concretely,
+ * that malformed frame is missing its right border and status text
+ * (pushed past column 80 by layout still sized for column 120), and writing
+ * enough lines to force the terminal to scroll. A subsequent *correct*
+ * frame, even a perfectly clean one, then lands on an already-scrolled
+ * viewport — which is exactly the "old content peeking in above the new
+ * frame" the real-Windows-Terminal screenshots kept showing on narrower
+ * resizes specifically (not shorter/wider/back-to-original, which don't
+ * force that overflow).
+ *
+ * app.tsx's own resize handler is registered inside a `useEffect`, which
+ * commits strictly after Ink's initial render/mount — so by construction it
+ * always runs *after* Ink's internal stale-layout repaint, never before. Its
+ * job is to clear right after that repaint (undoing its damage, scrollback
+ * included) and only then force a real React re-render with the current
+ * width, so the correct frame is the only thing written after the clear.
  */
-let lastColumns = process.stdout.columns;
-if (process.stdout.isTTY) {
-  process.stdout.on('resize', () => {
-    const columns = process.stdout.columns;
-    if (columns === lastColumns) return;
-    lastColumns = columns;
-    process.stdout.write(CLEAR_SCREEN);
-  });
-}
-
 const instance = render(<App />);
+setInkInstance(instance);
 
 instance.waitUntilExit().then(
   () => restoreScreen(),
