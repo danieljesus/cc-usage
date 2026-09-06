@@ -8,33 +8,27 @@ export const ERROR = 'red';
 export const INACTIVE = '#4b5563';
 
 /** Section icons — kept as one named table so they're not scattered loose through JSX. */
-// Emoji restored after TWO independent real measurements, not a guess —
-// each one catches a different bug class, and a glyph has to pass both:
+// Full emoji set, all in their original form — safe now for a real reason,
+// not just "it looked fine this time":
 //
-// 1. Real-terminal width (`scripts/measure-glyph-widths.mjs`): writes each
-//    candidate to a live terminal and reads its actual cursor advance back
-//    via DSR (`\x1b[6n`), compared against what `string-width` (what Ink's
-//    layout measures with) computes. Run in a real Windows Terminal window
-//    (`capture-out/glyph-widths.txt`, WT profile
-//    `{3ad42e7b-e073-5f3e-ac57-1c259ffa86a8}`, 2026-09-06) — a spawned
-//    window, not proven identical to every profile this app runs in, so a
-//    fragment reappearing on a specific machine means re-running this
-//    script there and dropping that one icon back to ASCII.
-// 2. Ink's own internal grid writer (no terminal involved at all — pure
-//    `ink-testing-library`): render `<Text>{icon} </Text><Text>NAME</Text>`
-//    in a bare Box and check the output is exactly `"{icon} NAME"`, one
-//    space. This is the one that actually caught something: `🖥️` (desktop
-//    computer + VS16) silently ate the space (`"🖥️NAME"`), and `⚡`
-//    (lightning, no VS16) doubled it (`"⚡  NAME"`) — both **before
-//    anything reaches a terminal**, entirely inside Ink's own Yoga/Output
-//    layer. Both passed check #1 (real width 2, matching what Ink budgets)
-//    yet were still broken — proof the original "terminal disagrees with
-//    Ink" theory, while real for `·`/`—`, was never the full story for
-//    every glyph. `💻` and `🏃` below are their replacements: same
-//    real-world width (2, confirmed both ways), no grid-writer bug.
+// Two independent bug classes were chased across this glyph set. (1) A
+// real-terminal width mismatch (Ink's `string-width`-based layout budget
+// disagreeing with what Windows Terminal actually renders — verified with
+// `scripts/measure-glyph-widths.mjs`, which writes each candidate to a live
+// terminal and reads the real cursor advance back via DSR, `\x1b[6n`).
+// (2) A genuine bug in Ink itself: its internal Output/grid writer used to
+// miscompute certain glyphs' printed width independently of its own layout
+// math, so a `<Text>{icon} </Text>` could render with the trailing space
+// doubled or eaten entirely — reproducible with zero terminal involved,
+// via plain `ink-testing-library` (`src/theme.test.tsx` encodes this check
+// permanently, one case per icon here).
 //
-// Every other icon here passed both checks in its ORIGINAL form (including
-// trailing U+FE0F where present) and needed no substitution.
+// `🖥️` and `⚡` hit exactly that Ink bug (confirmed: already reported and
+// fixed upstream — vadimdemedes/ink#748, fixed in commit `557ed22`, shipped
+// in Ink 6.3+). This project ran a substitute icon (💻/🏃) on Ink 5 while
+// that fix was out of reach; upgrading to Ink 7 (`package.json`, needs
+// React ≥19 — the reason Ink's own peer dependency jumped at 6.0) picks up
+// the fix directly, so the originals are back with no workaround needed.
 export const ICON = {
   fiveHour: '⏳️',
   weekly: '📅',
@@ -43,7 +37,7 @@ export const ICON = {
   credits: '💳',
   burnRate: '🔥',
   sparkline: '📊',
-  sessions: '💻', // was 🖥️ — ate its trailing space in Ink's own output buffer, see above
+  sessions: '🖥️',
   resetClock: '⏰️',
 } as const;
 
@@ -62,6 +56,6 @@ export const VERDICT_ICON = {
 } as const;
 
 export const SESSION_ICON = {
-  working: '🏃', // was ⚡ — doubled its trailing space in Ink's own output buffer, see ICON above
+  working: '⚡',
   idle: '💤',
 } as const;
