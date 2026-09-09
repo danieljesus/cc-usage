@@ -25,7 +25,7 @@ const startedAt = Date.now();
 
 // ---------------------------------------------------------------------------
 // Raw-mode DSR (Device Status Report) plumbing. Mirrors the restore-on-exit
-// pattern already used in src/bin.tsx (guard + finally + exit/SIGINT/SIGTERM)
+// pattern already used in src/main.tsx (guard + finally + exit/SIGINT/SIGTERM)
 // so this never leaves the user's shell in raw mode if something throws.
 // ---------------------------------------------------------------------------
 
