@@ -6,6 +6,10 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y e
 
 ## [Unreleased]
 
+### Añadido
+
+- Panel por modelo para los límites que la API devuelve en `limits[]` con `scope.model`: Fable aparece ahí como tope **semanal** propio (`kind: weekly_scoped`, `group: weekly`), no como ventana de 5 h. La etiqueta (`FABLE 7d` / `FABLE 5h`) sale del `group` que reporta la API, así que si algún día llega como sesión se pinta sin tocar código. Opus/Sonnet no se duplican si el plan ya los expone como `seven_day_opus` / `seven_day_sonnet`.
+
 ## [0.1.0] - 2026-09-10
 
 Primera release. Recoge todo el desarrollo desde el commit inicial (2026-09-05).

@@ -8,7 +8,12 @@ import { readCredentials } from './data/credentials.js';
 import { appendIfChanged, type HistoryPoint, pruneOnStartup } from './data/history.js';
 import { readSessions, type SessionInfo } from './data/sessions.js';
 import { readSnapshot } from './data/snapshot.js';
-import { fetchUsage, type UsageSnapshot } from './data/usage-api.js';
+import {
+  fetchUsage,
+  type LimitGroup,
+  type ModelScopedWindow,
+  type UsageSnapshot,
+} from './data/usage-api.js';
 import { age } from './format.js';
 import { resetInkBookkeeping } from './ink-handle.js';
 import { project } from './projection.js';
@@ -58,6 +63,55 @@ const BASELINE_CONTENT_WIDTH = 62;
 const BASELINE_METER_WIDTH = 20;
 const BASELINE_SPARK_WIDTH = 10;
 const MAX_METER_WIDTH = 80;
+
+const SCOPED_ICON: Record<string, string> = {
+  fable: ICON.fable,
+  opus: ICON.opus,
+  sonnet: ICON.sonnet,
+};
+
+function scopedWindowSuffix(group: LimitGroup | null): string {
+  switch (group) {
+    case 'session':
+      return '5h';
+    case 'weekly':
+      return '7d';
+    default:
+      return '';
+  }
+}
+
+interface ScopedPanel {
+  label: string;
+  icon: string;
+  window: ModelScopedWindow;
+}
+
+/**
+ * Per-model caps reported under `limits[]` (Fable arrives here as a
+ * weekly-scoped cap, see usage-api.ts). Opus/Sonnet are skipped when the
+ * legacy top-level `seven_day_opus` / `seven_day_sonnet` already rendered
+ * them, so a plan exposing both shapes doesn't show the same cap twice.
+ */
+export function scopedPanels(usage: UsageSnapshot | null): ScopedPanel[] {
+  if (!usage) return [];
+  const alreadyShown = new Set<string>();
+  if (usage.sevenDayOpus) alreadyShown.add('opus');
+  if (usage.sevenDaySonnet) alreadyShown.add('sonnet');
+  const panels: ScopedPanel[] = [];
+  for (const window of usage.modelScoped) {
+    const key = window.displayName.toLowerCase();
+    if (window.group === 'weekly' && alreadyShown.has(key)) continue;
+    panels.push({
+      label: [window.displayName.toUpperCase(), scopedWindowSuffix(window.group)]
+        .filter(Boolean)
+        .join(' '),
+      icon: SCOPED_ICON[key] ?? ICON.model,
+      window,
+    });
+  }
+  return panels;
+}
 const MAX_SPARK_WIDTH = 40;
 
 type Freshness = 'live' | 'stale' | 'offline';
@@ -265,6 +319,16 @@ export function App() {
           compact
         />
       )}
+      {scopedPanels(usage).map((panel) => (
+        <WindowPanel
+          key={panel.label}
+          icon={panel.icon}
+          label={panel.label}
+          window={panel.window}
+          meterWidth={meterWidth}
+          compact
+        />
+      ))}
       {usage?.credits && (
         <WindowPanel
           icon={ICON.credits}

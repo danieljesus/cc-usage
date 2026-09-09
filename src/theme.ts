@@ -34,6 +34,9 @@ export const ICON = {
   weekly: '📅',
   opus: '🧠',
   sonnet: '🎯',
+  fable: '🔮',
+  // Any other per-model cap the API starts reporting under `limits[]`.
+  model: '🧩',
   credits: '💳',
   burnRate: '🔥',
   sparkline: '📊',

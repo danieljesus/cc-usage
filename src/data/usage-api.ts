@@ -15,8 +15,12 @@ export interface CreditsWindow extends UsageWindow {
   currency: string | null;
 }
 
+/** Which quota window a model-scoped limit lives in. `null` when the API doesn't say. */
+export type LimitGroup = 'session' | 'weekly';
+
 export interface ModelScopedWindow extends UsageWindow {
   displayName: string;
+  group: LimitGroup | null;
 }
 
 export interface UsageSnapshot {
@@ -79,6 +83,17 @@ function toCredits(raw: unknown): CreditsWindow | null {
   };
 }
 
+function toGroup(value: unknown): LimitGroup | null {
+  return value === 'session' || value === 'weekly' ? value : null;
+}
+
+/**
+ * `limits[]` is the newer, self-describing list: confirmed live (2026-09-10)
+ * that a per-model cap arrives here — `kind: 'weekly_scoped'`,
+ * `group: 'weekly'`, `scope.model.display_name: 'Fable'` — and NOT as a
+ * dedicated top-level key like `seven_day_opus`. `group` is what says which
+ * window the cap belongs to, so it's kept rather than assumed weekly.
+ */
 function toModelScoped(raw: unknown): ModelScopedWindow[] {
   if (!Array.isArray(raw)) return [];
   const out: ModelScopedWindow[] = [];
@@ -90,7 +105,12 @@ function toModelScoped(raw: unknown): ModelScopedWindow[] {
     const displayName = typeof model?.display_name === 'string' ? model.display_name : null;
     const utilization = toPct(obj.percent);
     if (!displayName || utilization === null) continue;
-    out.push({ displayName, utilization, resetsAt: toDate(obj.resets_at) });
+    out.push({
+      displayName,
+      group: toGroup(obj.group),
+      utilization,
+      resetsAt: toDate(obj.resets_at),
+    });
   }
   return out;
 }
