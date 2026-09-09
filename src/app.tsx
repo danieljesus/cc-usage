@@ -159,8 +159,8 @@ export function App() {
 
     const pollTimer = setInterval(() => void poll(), POLL_MS);
     const tickTimer = setInterval(() => forceTick((n) => n + 1), TICK_MS);
-    // The clear has to happen from here, not from bin.tsx before render() —
-    // see bin.tsx's comment for the full byte-level evidence. Effects commit
+    // The clear has to happen from here, not from main.tsx before render() —
+    // see main.tsx's comment for the full byte-level evidence. Effects commit
     // strictly after Ink's own initial render/mount, so this handler is
     // guaranteed to run after Ink's internal resize repaint (which uses the
     // stale, pre-resize layout and is what actually overflows/scrolls the
