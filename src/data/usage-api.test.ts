@@ -29,10 +29,13 @@ describe('fetchUsage', () => {
         seven_day_sonnet: null,
         extra_usage: { is_enabled: false },
         limits: [
+          { kind: 'session', group: 'session', percent: 19, scope: null },
           {
-            percent: 0,
-            resets_at: null,
-            scope: { model: { display_name: 'Fable' } },
+            kind: 'weekly_scoped',
+            group: 'weekly',
+            percent: 5,
+            resets_at: '2026-09-09T20:59:59.820Z',
+            scope: { model: { id: null, display_name: 'Fable' }, surface: null },
           },
         ],
       }),
@@ -50,7 +53,12 @@ describe('fetchUsage', () => {
     expect(result.snapshot.sevenDayOpus).toBeNull();
     expect(result.snapshot.credits).toBeNull();
     expect(result.snapshot.modelScoped).toEqual([
-      { displayName: 'Fable', utilization: 0, resetsAt: null },
+      {
+        displayName: 'Fable',
+        group: 'weekly',
+        utilization: 5,
+        resetsAt: new Date('2026-09-09T20:59:59.820Z'),
+      },
     ]);
   });
 
@@ -138,7 +146,28 @@ describe('fetchUsage', () => {
     expect(result.ok).toBe(true);
     if (!result.ok) return;
     expect(result.snapshot.modelScoped).toEqual([
-      { displayName: 'Opus', utilization: 5, resetsAt: null },
+      { displayName: 'Opus', group: null, utilization: 5, resetsAt: null },
+    ]);
+  });
+
+  it('keeps the limit group only when it is one of the known windows', async () => {
+    mockFetch({
+      ok: true,
+      json: () => ({
+        limits: [
+          { group: 'session', percent: 1, scope: { model: { display_name: 'A' } } },
+          { group: 'weekly', percent: 2, scope: { model: { display_name: 'B' } } },
+          { group: 'monthly', percent: 3, scope: { model: { display_name: 'C' } } },
+        ],
+      }),
+    });
+    const result = await fetchUsage(CREDS);
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.snapshot.modelScoped.map((m) => [m.displayName, m.group])).toEqual([
+      ['A', 'session'],
+      ['B', 'weekly'],
+      ['C', null],
     ]);
   });
 
