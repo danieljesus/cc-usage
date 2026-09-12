@@ -35,6 +35,8 @@ export const ICON = {
   opus: '🧠',
   sonnet: '🎯',
   fable: '🔮',
+  // The plain weekly cap, drawn beside the per-model ones inside the weekly group.
+  standard: '🌐',
   // Any other per-model cap the API starts reporting under `limits[]`.
   model: '🧩',
   credits: '💳',

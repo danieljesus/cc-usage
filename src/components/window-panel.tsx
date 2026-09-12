@@ -7,6 +7,13 @@ import { ICON, MUTED, VERDICT_ICON } from '../theme.js';
 import { Meter } from './meter.js';
 import { Sparkline } from './sparkline.js';
 
+/**
+ * Columns reserved for `icon + label` before the meter, shared by every
+ * panel so all meters line up. Sized for the widest nested label the weekly
+ * group draws ("  🌐 ESTÁNDAR", 13 cols) plus one column of breathing room.
+ */
+export const LABEL_WIDTH = 14;
+
 interface WindowPanelProps {
   icon: string;
   label: string;
@@ -36,6 +43,77 @@ function verdictLabel(projection: Projection): string {
   }
 }
 
+/** "⏰️ renueva mié 16/09 23:00  -  faltan 4d11h", or null when the reset is unknown. */
+export function resetLine(resetsAt: Date | null): string | null {
+  const reset = resetAt(resetsAt);
+  if (!reset) return null;
+  const remaining = until(resetsAt);
+  // ASCII '-', not '·' — see app.tsx's top comment for why.
+  return `${ICON.resetClock} renueva ${reset}${remaining ? `  -  faltan ${remaining}` : ''}`;
+}
+
+interface MeterRowProps {
+  icon: string;
+  label: string;
+  pct: number;
+  meterWidth: number;
+  /** Columns of indentation inside the label column (nested sections). */
+  indent?: number;
+}
+
+export function MeterRow({ icon, label, pct, meterWidth, indent = 0 }: MeterRowProps) {
+  return (
+    <Box>
+      <Box width={LABEL_WIDTH}>
+        <Text bold>
+          {' '.repeat(indent)}
+          {icon} {label}
+        </Text>
+      </Box>
+      <Meter pct={pct} width={meterWidth} />
+      <Text bold color={healthColor(pct)}>
+        {' '}
+        {pct.toFixed(0)}%
+      </Text>
+    </Box>
+  );
+}
+
+interface TrendRowProps {
+  values: number[];
+  projection?: Projection | null;
+  sparkWidth: number;
+  isWeekly: boolean;
+  indent?: number;
+}
+
+/** Sparkline plus burn rate and verdict. Renders nothing below 2 samples. */
+export function TrendRow({ values, projection, sparkWidth, isWeekly, indent = 2 }: TrendRowProps) {
+  if (values.length < 2) return null;
+  return (
+    <Box>
+      <Text color={MUTED}>
+        {' '.repeat(indent)}
+        {ICON.sparkline}{' '}
+      </Text>
+      <Sparkline values={values} width={sparkWidth} />
+      {projection && (
+        <Text color={MUTED}>
+          {'   '}
+          {ICON.burnRate} {formatSlope(projection.slopePerHour, isWeekly)}
+          {'   '}
+          {VERDICT_ICON[projection.verdict]} {verdictLabel(projection)}
+        </Text>
+      )}
+    </Box>
+  );
+}
+
+export function isWeeklyLabel(label: string): boolean {
+  const lower = label.toLowerCase();
+  return lower.includes('semanal') || lower.includes('7d');
+}
+
 export function WindowPanel({
   icon,
   label,
@@ -56,49 +134,24 @@ export function WindowPanel({
     );
   }
 
-  const pct = window.utilization;
-  const reset = resetAt(window.resetsAt);
-  const remaining = until(window.resetsAt);
-  const isWeekly = label.toLowerCase().includes('semanal') || label.toLowerCase().includes('7d');
+  const reset = resetLine(window.resetsAt);
 
   return (
     <Box flexDirection="column">
-      <Box>
-        <Box width={13}>
-          <Text bold>
-            {icon} {label}
-          </Text>
-        </Box>
-        <Meter pct={pct} width={meterWidth} />
-        <Text bold color={healthColor(pct)}>
-          {' '}
-          {pct.toFixed(0)}%
-        </Text>
-      </Box>
+      <MeterRow icon={icon} label={label} pct={window.utilization} meterWidth={meterWidth} />
       {!compact && reset && (
         <Text color={MUTED}>
           {'  '}
-          {ICON.resetClock} renueva {reset}
-          {/* ASCII '-', not '·' — see app.tsx's top comment for why. */}
-          {remaining ? `  -  faltan ${remaining}` : ''}
+          {reset}
         </Text>
       )}
-      {!compact && sparklineValues && sparklineValues.length >= 2 && (
-        <Box>
-          <Text color={MUTED}>
-            {'  '}
-            {ICON.sparkline}{' '}
-          </Text>
-          <Sparkline values={sparklineValues} width={sparkWidth} />
-          {projection && (
-            <Text color={MUTED}>
-              {'   '}
-              {ICON.burnRate} {formatSlope(projection.slopePerHour, isWeekly)}
-              {'   '}
-              {VERDICT_ICON[projection.verdict]} {verdictLabel(projection)}
-            </Text>
-          )}
-        </Box>
+      {!compact && sparklineValues && (
+        <TrendRow
+          values={sparklineValues}
+          projection={projection}
+          sparkWidth={sparkWidth}
+          isWeekly={isWeeklyLabel(label)}
+        />
       )}
     </Box>
   );

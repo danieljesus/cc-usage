@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { scopedPanels } from './app.js';
+import { modelCaps, sharesReset } from './app.js';
 import type { ModelScopedWindow, UsageSnapshot } from './data/usage-api.js';
 import { ICON } from './theme.js';
 
@@ -25,29 +25,31 @@ function scoped(
   return { displayName, group, utilization, resetsAt: null };
 }
 
-describe('scopedPanels', () => {
+describe('modelCaps', () => {
   it('returns nothing without a snapshot', () => {
-    expect(scopedPanels(null)).toEqual([]);
+    expect(modelCaps(null)).toEqual([]);
   });
 
-  it('labels the panel with the window the API reports the cap in', () => {
-    const panels = scopedPanels(
+  it('labels each cap with the window the API reports it in and keys it for history', () => {
+    const caps = modelCaps(
       snapshot({
         modelScoped: [scoped('Fable', 'weekly'), scoped('Fable', 'session'), scoped('Fable', null)],
       }),
     );
-    expect(panels.map((p) => p.label)).toEqual(['FABLE 7d', 'FABLE 5h', 'FABLE']);
-    expect(panels.every((p) => p.icon === ICON.fable)).toBe(true);
+    expect(caps.map((c) => c.label)).toEqual(['FABLE 7d', 'FABLE 5h', 'FABLE']);
+    expect(caps.map((c) => c.key)).toEqual(['fable:7d', 'fable:5h', 'fable']);
+    expect(caps.map((c) => c.name)).toEqual(['FABLE', 'FABLE', 'FABLE']);
+    expect(caps.every((c) => c.icon === ICON.fable)).toBe(true);
   });
 
   it('falls back to the generic model icon for unknown models', () => {
-    const [panel] = scopedPanels(snapshot({ modelScoped: [scoped('Haiku', 'weekly')] }));
-    expect(panel.icon).toBe(ICON.model);
-    expect(panel.label).toBe('HAIKU 7d');
+    const [capItem] = modelCaps(snapshot({ modelScoped: [scoped('Haiku', 'weekly')] }));
+    expect(capItem.icon).toBe(ICON.model);
+    expect(capItem.label).toBe('HAIKU 7d');
   });
 
-  it('skips a weekly Opus/Sonnet cap already rendered from the legacy top-level field', () => {
-    const panels = scopedPanels(
+  it('lists the legacy Opus/Sonnet weekly caps and skips their duplicate in limits[]', () => {
+    const caps = modelCaps(
       snapshot({
         sevenDayOpus: { utilization: 10, resetsAt: null },
         modelScoped: [
@@ -57,6 +59,23 @@ describe('scopedPanels', () => {
         ],
       }),
     );
-    expect(panels.map((p) => p.label)).toEqual(['OPUS 5h', 'SONNET 7d']);
+    expect(caps.map((c) => c.label)).toEqual(['OPUS 7d', 'OPUS 5h', 'SONNET 7d']);
+    expect(caps[0].window.utilization).toBe(10);
+    expect(caps[0].icon).toBe(ICON.opus);
+  });
+});
+
+describe('sharesReset', () => {
+  const at = (ms: number) => ({ utilization: 0, resetsAt: new Date(ms) });
+
+  it('is true for the same instant and within a minute of slack', () => {
+    expect(sharesReset(at(1_000_000), at(1_000_000))).toBe(true);
+    expect(sharesReset(at(1_000_000), at(1_059_000))).toBe(true);
+  });
+
+  it('is false beyond the tolerance or when either reset is unknown', () => {
+    expect(sharesReset(at(1_000_000), at(1_061_000))).toBe(false);
+    expect(sharesReset(at(1_000_000), { utilization: 0, resetsAt: null })).toBe(false);
+    expect(sharesReset(null, at(1_000_000))).toBe(false);
   });
 });

@@ -8,7 +8,13 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y e
 
 ### Añadido
 
+- Panel SEMANAL dividido en secciones cuando hay topes por modelo que renuevan a la vez que la ventana de 7 d (Fable, y Opus/Sonnet si el plan los expone): una fila `ESTÁNDAR` con el tope global y una por modelo, cada una con su medidor, sparkline, tasa de consumo y veredicto. La línea de renovación se pinta una sola vez, al lado del título (o debajo si no cabe sin partir la fila). Un tope por modelo con otra fecha de renovación sigue saliendo como panel compacto aparte.
+- El histórico (`usage-history.jsonl`) guarda también los topes por modelo en `models` (`{"fable:7d": 76}`), que es lo que permite proyectar Fable. Las líneas antiguas sin ese campo se siguen leyendo igual.
 - Panel por modelo para los límites que la API devuelve en `limits[]` con `scope.model`: Fable aparece ahí como tope **semanal** propio (`kind: weekly_scoped`, `group: weekly`), no como ventana de 5 h. La etiqueta (`FABLE 7d` / `FABLE 5h`) sale del `group` que reporta la API, así que si algún día llega como sesión se pinta sin tocar código. Opus/Sonnet no se duplican si el plan ya los expone como `seven_day_opus` / `seven_day_sonnet`.
+
+### Cambiado
+
+- Columna de etiqueta de los paneles de 13 a 14 columnas, para que las secciones anidadas del panel semanal (`  🌐 ESTÁNDAR`) quepan con un espacio antes del medidor y todos los medidores sigan alineados.
 
 ## [0.1.0] - 2026-09-10
 

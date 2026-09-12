@@ -9,9 +9,30 @@ export interface HistoryPoint {
   ts: number; // epoch ms
   fiveHour: number | null;
   sevenDay: number | null;
+  /**
+   * Per-model caps keyed by `modelCaps()`'s key (app.tsx), e.g. `fable:7d`.
+   * Omitted entirely (not `{}`) when the API reported none, so lines written
+   * before this field existed and lines from plans without per-model caps
+   * look the same.
+   */
+  models?: Record<string, number>;
 }
 
-let lastAppended: { fiveHour: number | null; sevenDay: number | null } | null = null;
+type PointValues = Pick<HistoryPoint, 'fiveHour' | 'sevenDay' | 'models'>;
+
+let lastAppended: PointValues | null = null;
+
+function sameModels(a: Record<string, number> | undefined, b: Record<string, number> | undefined) {
+  const ka = Object.keys(a ?? {});
+  const kb = Object.keys(b ?? {});
+  if (ka.length !== kb.length) return false;
+  return ka.every((k) => a?.[k] === b?.[k]);
+}
+
+/** True when two samples carry the same readings — the only thing worth a new history line. */
+export function sameValues(a: PointValues, b: PointValues): boolean {
+  return a.fiveHour === b.fiveHour && a.sevenDay === b.sevenDay && sameModels(a.models, b.models);
+}
 
 /**
  * Appends a sample only when the values actually changed since the last
@@ -20,19 +41,22 @@ let lastAppended: { fiveHour: number | null; sevenDay: number | null } | null = 
  * worth crashing the UI over.
  */
 export async function appendIfChanged(point: HistoryPoint): Promise<void> {
-  if (
-    lastAppended &&
-    lastAppended.fiveHour === point.fiveHour &&
-    lastAppended.sevenDay === point.sevenDay
-  ) {
-    return;
-  }
-  lastAppended = { fiveHour: point.fiveHour, sevenDay: point.sevenDay };
+  if (lastAppended && sameValues(lastAppended, point)) return;
+  lastAppended = { fiveHour: point.fiveHour, sevenDay: point.sevenDay, models: point.models };
   try {
     await appendFile(HISTORY_PATH, `${JSON.stringify(point)}\n`, 'utf-8');
   } catch {
     // Best-effort only.
   }
+}
+
+function toModels(raw: unknown): Record<string, number> | undefined {
+  if (typeof raw !== 'object' || raw === null || Array.isArray(raw)) return undefined;
+  const out: Record<string, number> = {};
+  for (const [key, value] of Object.entries(raw)) {
+    if (typeof value === 'number' && Number.isFinite(value)) out[key] = value;
+  }
+  return Object.keys(out).length > 0 ? out : undefined;
 }
 
 export async function readHistory(): Promise<HistoryPoint[]> {
@@ -44,11 +68,14 @@ export async function readHistory(): Promise<HistoryPoint[]> {
       try {
         const parsed = JSON.parse(line) as Partial<HistoryPoint>;
         if (typeof parsed.ts === 'number') {
-          points.push({
+          const point: HistoryPoint = {
             ts: parsed.ts,
             fiveHour: typeof parsed.fiveHour === 'number' ? parsed.fiveHour : null,
             sevenDay: typeof parsed.sevenDay === 'number' ? parsed.sevenDay : null,
-          });
+          };
+          const models = toModels(parsed.models);
+          if (models) point.models = models;
+          points.push(point);
         }
       } catch {
         // Skip malformed line.
@@ -77,10 +104,8 @@ export async function pruneOnStartup(): Promise<HistoryPoint[]> {
     }
   }
   if (kept.length > 0) {
-    lastAppended = {
-      fiveHour: kept[kept.length - 1].fiveHour,
-      sevenDay: kept[kept.length - 1].sevenDay,
-    };
+    const last = kept[kept.length - 1];
+    lastAppended = { fiveHour: last.fiveHour, sevenDay: last.sevenDay, models: last.models };
   }
   return kept;
 }

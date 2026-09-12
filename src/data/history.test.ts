@@ -46,6 +46,41 @@ describe('appendIfChanged', () => {
     expect(fsp.appendFile).toHaveBeenCalledTimes(2);
   });
 
+  it('appends again when only a per-model cap changes', async () => {
+    const { fsp, history } = await freshHistoryModule();
+    await history.appendIfChanged({
+      ts: 1000,
+      fiveHour: 10,
+      sevenDay: 1,
+      models: { 'fable:7d': 70 },
+    });
+    await history.appendIfChanged({
+      ts: 2000,
+      fiveHour: 10,
+      sevenDay: 1,
+      models: { 'fable:7d': 70 },
+    });
+    await history.appendIfChanged({
+      ts: 3000,
+      fiveHour: 10,
+      sevenDay: 1,
+      models: { 'fable:7d': 71 },
+    });
+    expect(fsp.appendFile).toHaveBeenCalledTimes(2);
+    expect(fsp.appendFile).toHaveBeenLastCalledWith(
+      expect.any(String),
+      `${JSON.stringify({ ts: 3000, fiveHour: 10, sevenDay: 1, models: { 'fable:7d': 71 } })}\n`,
+      'utf-8',
+    );
+  });
+
+  it('treats a missing models map and an empty one as the same reading', async () => {
+    const { fsp, history } = await freshHistoryModule();
+    await history.appendIfChanged({ ts: 1000, fiveHour: 10, sevenDay: 1 });
+    await history.appendIfChanged({ ts: 2000, fiveHour: 10, sevenDay: 1, models: {} });
+    expect(fsp.appendFile).toHaveBeenCalledTimes(1);
+  });
+
   it('swallows a write failure rather than throwing', async () => {
     const { fsp, history } = await freshHistoryModule();
     vi.mocked(fsp.appendFile).mockRejectedValueOnce(new Error('ENOSPC'));
@@ -64,6 +99,18 @@ describe('readHistory', () => {
     const points = await history.readHistory();
     expect(points).toEqual([
       { ts: 1000, fiveHour: 10, sevenDay: 1 },
+      { ts: 2000, fiveHour: 11, sevenDay: 1 },
+    ]);
+  });
+
+  it('keeps per-model caps and drops non-numeric entries from them', async () => {
+    const { fsp, history } = await freshHistoryModule();
+    vi.mocked(fsp.readFile).mockResolvedValue(
+      '{"ts":1000,"fiveHour":10,"sevenDay":1,"models":{"fable:7d":70,"bogus":"x"}}\n{"ts":2000,"fiveHour":11,"sevenDay":1,"models":{}}\n',
+    );
+    const points = await history.readHistory();
+    expect(points).toEqual([
+      { ts: 1000, fiveHour: 10, sevenDay: 1, models: { 'fable:7d': 70 } },
       { ts: 2000, fiveHour: 11, sevenDay: 1 },
     ]);
   });

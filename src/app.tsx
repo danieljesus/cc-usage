@@ -3,16 +3,17 @@ import { useEffect, useState } from 'react';
 import { GradientBox } from './components/gradient-box.js';
 import { GradientText } from './components/gradient-text.js';
 import { SessionsPanel } from './components/sessions-panel.js';
+import { type GroupSection, WindowGroup } from './components/window-group.js';
 import { WindowPanel } from './components/window-panel.js';
 import { readCredentials } from './data/credentials.js';
-import { appendIfChanged, type HistoryPoint, pruneOnStartup } from './data/history.js';
+import { appendIfChanged, type HistoryPoint, pruneOnStartup, sameValues } from './data/history.js';
 import { readSessions, type SessionInfo } from './data/sessions.js';
 import { readSnapshot } from './data/snapshot.js';
 import {
   fetchUsage,
   type LimitGroup,
-  type ModelScopedWindow,
   type UsageSnapshot,
+  type UsageWindow,
 } from './data/usage-api.js';
 import { age } from './format.js';
 import { resetInkBookkeeping } from './ink-handle.js';
@@ -64,13 +65,15 @@ const BASELINE_METER_WIDTH = 20;
 const BASELINE_SPARK_WIDTH = 10;
 const MAX_METER_WIDTH = 80;
 
-const SCOPED_ICON: Record<string, string> = {
+const MAX_SPARK_WIDTH = 40;
+
+const MODEL_ICON: Record<string, string> = {
   fable: ICON.fable,
   opus: ICON.opus,
   sonnet: ICON.sonnet,
 };
 
-function scopedWindowSuffix(group: LimitGroup | null): string {
+function windowSuffix(group: LimitGroup | null): string {
   switch (group) {
     case 'session':
       return '5h';
@@ -81,38 +84,67 @@ function scopedWindowSuffix(group: LimitGroup | null): string {
   }
 }
 
-interface ScopedPanel {
+export interface ModelCap {
+  /** History key (`fable:7d`): model plus the window it lives in. */
+  key: string;
+  /** Standalone panel title (`FABLE 7d`). */
   label: string;
+  /** Model alone (`FABLE`), for when the window is implied by the group it's drawn in. */
+  name: string;
   icon: string;
-  window: ModelScopedWindow;
+  group: LimitGroup | null;
+  window: UsageWindow;
+}
+
+function cap(name: string, group: LimitGroup | null, window: UsageWindow): ModelCap {
+  const lower = name.toLowerCase();
+  const suffix = windowSuffix(group);
+  return {
+    key: suffix ? `${lower}:${suffix}` : lower,
+    label: [name.toUpperCase(), suffix].filter(Boolean).join(' '),
+    name: name.toUpperCase(),
+    icon: MODEL_ICON[lower] ?? ICON.model,
+    group,
+    window,
+  };
 }
 
 /**
- * Per-model caps reported under `limits[]` (Fable arrives here as a
- * weekly-scoped cap, see usage-api.ts). Opus/Sonnet are skipped when the
- * legacy top-level `seven_day_opus` / `seven_day_sonnet` already rendered
- * them, so a plan exposing both shapes doesn't show the same cap twice.
+ * Every per-model cap in the snapshot: the legacy top-level
+ * `seven_day_opus` / `seven_day_sonnet` first, then whatever `limits[]`
+ * reports (Fable arrives there as a weekly-scoped cap, see usage-api.ts).
+ * A weekly Opus/Sonnet entry in `limits[]` is dropped when the legacy field
+ * already carried it, so a plan exposing both shapes doesn't list the same
+ * cap twice.
  */
-export function scopedPanels(usage: UsageSnapshot | null): ScopedPanel[] {
+export function modelCaps(usage: UsageSnapshot | null): ModelCap[] {
   if (!usage) return [];
-  const alreadyShown = new Set<string>();
-  if (usage.sevenDayOpus) alreadyShown.add('opus');
-  if (usage.sevenDaySonnet) alreadyShown.add('sonnet');
-  const panels: ScopedPanel[] = [];
+  const caps: ModelCap[] = [];
+  if (usage.sevenDayOpus) caps.push(cap('Opus', 'weekly', usage.sevenDayOpus));
+  if (usage.sevenDaySonnet) caps.push(cap('Sonnet', 'weekly', usage.sevenDaySonnet));
+  const seen = new Set(caps.map((c) => c.key));
   for (const window of usage.modelScoped) {
-    const key = window.displayName.toLowerCase();
-    if (window.group === 'weekly' && alreadyShown.has(key)) continue;
-    panels.push({
-      label: [window.displayName.toUpperCase(), scopedWindowSuffix(window.group)]
-        .filter(Boolean)
-        .join(' '),
-      icon: SCOPED_ICON[key] ?? ICON.model,
-      window,
-    });
+    const next = cap(window.displayName, window.group, window);
+    if (seen.has(next.key)) continue;
+    seen.add(next.key);
+    caps.push(next);
   }
-  return panels;
+  return caps;
 }
-const MAX_SPARK_WIDTH = 40;
+
+/** Same renewal instant, within the slack the API's own timestamps show between windows. */
+const SAME_RESET_TOLERANCE_MS = 60_000;
+
+export function sharesReset(a: UsageWindow | null, b: UsageWindow | null): boolean {
+  if (!a?.resetsAt || !b?.resetsAt) return false;
+  return Math.abs(a.resetsAt.getTime() - b.resetsAt.getTime()) <= SAME_RESET_TOLERANCE_MS;
+}
+
+function modelsOf(usage: UsageSnapshot): Record<string, number> | undefined {
+  const caps = modelCaps(usage);
+  if (caps.length === 0) return undefined;
+  return Object.fromEntries(caps.map((c) => [c.key, c.window.utilization]));
+}
 
 type Freshness = 'live' | 'stale' | 'offline';
 
@@ -191,12 +223,12 @@ export function App() {
           fiveHour: result.snapshot.fiveHour?.utilization ?? null,
           sevenDay: result.snapshot.sevenDay?.utilization ?? null,
         };
+        const models = modelsOf(result.snapshot);
+        if (models) point.models = models;
         await appendIfChanged(point);
         setHistory((prev) => {
           const last = prev[prev.length - 1];
-          if (last && last.fiveHour === point.fiveHour && last.sevenDay === point.sevenDay) {
-            return prev;
-          }
+          if (last && sameValues(last, point)) return prev;
           return [...prev, point];
         });
       }
@@ -267,6 +299,31 @@ export function App() {
       )
     : [];
 
+  // Per-model caps that renew with the weekly window join it as sections of
+  // one group (their trend uses the same window start); the rest stay as
+  // standalone compact panels.
+  const caps = modelCaps(usage);
+  const weeklyCaps = caps.filter((c) => c.group === 'weekly' && sharesReset(c.window, sevenDay));
+  const standaloneCaps = caps.filter((c) => !weeklyCaps.includes(c));
+  const weeklySections: GroupSection[] = weeklyCaps.map((c) => {
+    const pick = (p: HistoryPoint) => p.models?.[c.key] ?? null;
+    return {
+      key: c.key,
+      icon: c.icon,
+      label: c.name,
+      window: c.window,
+      sparklineValues: sevenDayStart
+        ? seriesFor(
+            history.filter((p) => p.ts >= sevenDayStart.getTime()),
+            pick,
+          )
+        : [],
+      projection: sevenDayStart
+        ? project(history, pick, sevenDayStart, sevenDay?.resetsAt ?? null)
+        : null,
+    };
+  });
+
   return (
     <GradientBox width={width}>
       <Box justifyContent="space-between">
@@ -290,41 +347,47 @@ export function App() {
       />
       <Box height={1} />
 
-      <WindowPanel
-        icon={ICON.weekly}
-        label="SEMANAL"
-        window={sevenDay}
-        sparklineValues={sevenDaySpark}
-        projection={sevenDayProjection}
-        meterWidth={meterWidth}
-        sparkWidth={sparkWidth}
-        compact={compact}
-      />
+      {sevenDay && weeklySections.length > 0 ? (
+        <WindowGroup
+          icon={ICON.weekly}
+          label="SEMANAL"
+          resetsAt={sevenDay.resetsAt}
+          isWeekly
+          sections={[
+            {
+              key: 'standard',
+              icon: ICON.standard,
+              label: 'ESTÁNDAR',
+              window: sevenDay,
+              sparklineValues: sevenDaySpark,
+              projection: sevenDayProjection,
+            },
+            ...weeklySections,
+          ]}
+          meterWidth={meterWidth}
+          sparkWidth={sparkWidth}
+          compact={compact}
+          width={contentWidth}
+        />
+      ) : (
+        <WindowPanel
+          icon={ICON.weekly}
+          label="SEMANAL"
+          window={sevenDay}
+          sparklineValues={sevenDaySpark}
+          projection={sevenDayProjection}
+          meterWidth={meterWidth}
+          sparkWidth={sparkWidth}
+          compact={compact}
+        />
+      )}
 
-      {usage?.sevenDayOpus && (
+      {standaloneCaps.map((c) => (
         <WindowPanel
-          icon={ICON.opus}
-          label="OPUS 7d"
-          window={usage.sevenDayOpus}
-          meterWidth={meterWidth}
-          compact
-        />
-      )}
-      {usage?.sevenDaySonnet && (
-        <WindowPanel
-          icon={ICON.sonnet}
-          label="SONNET 7d"
-          window={usage.sevenDaySonnet}
-          meterWidth={meterWidth}
-          compact
-        />
-      )}
-      {scopedPanels(usage).map((panel) => (
-        <WindowPanel
-          key={panel.label}
-          icon={panel.icon}
-          label={panel.label}
-          window={panel.window}
+          key={c.key}
+          icon={c.icon}
+          label={c.label}
+          window={c.window}
           meterWidth={meterWidth}
           compact
         />
